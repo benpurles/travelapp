@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cancun Travel Deals</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #09f;
+            animation: spin 1s ease infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto p-4">
+        <h1 class="text-3xl font-bold mb-4">Cancun Travel Deals</h1>
+        <form id="searchForm" class="mb-4">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block mb-2">Start Month</label>
+                    <select name="startMonth" class="w-full p-2 border rounded" required>
+                        <option value="">Select</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block mb-2">End Month</label>
+                    <select name="endMonth" class="w-full p-2 border rounded" required>
+                        <option value="">Select</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block mb-2">Number of Nights</label>
+                    <input type="number" name="nights" min="1" max="7" class="w-full p-2 border rounded" required>
+                </div>
+                <div>
+                    <label class="block mb-2">Accommodation Type</label>
+                    <select name="accommodationType" class="w-full p-2 border rounded" required>
+                        <option value="">Select</option>
+                        <option value="hotel">Hotel</option>
+                        <option value="resort">Resort</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block mb-2">Star Rating</label>
+                    <select name="starRating" class="w-full p-2 border rounded" required>
+                        <option value="">Select</option>
+                        <option value="3,4,5">3+ Stars</option>
+                        <option value="4,5">4+ Stars</option>
+                        <option value="5">5 Stars</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block mb-2">
+                        <input type="checkbox" name="allInclusive" class="mr-2">
+                        All-Inclusive
+                    </label>
+                </div>
+                <div>
+                    <label class="block mb-2">Number of Adults</label>
+                    <input type="number" name="adults" min="1" class="w-full p-2 border rounded" required>
+                </div>
+                <div>
+                    <label class="block mb-2">Number of Rooms</label>
+                    <input type="number" name="rooms" min="1" class="w-full p-2 border rounded" required>
+                </div>
+            </div>
+            <button type="submit" class="mt-4 bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Find Best Deal</button>
+        </form>
+        <div id="loading" class="hidden flex justify-center items-center mb-4">
+            <div class="spinner"></div>
+            <p class="ml-2">Searching for the best deal...</p>
+        </div>
+        <div id="result" class="hidden bg-white shadow-md rounded-lg p-6"></div>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const monthSelect = document.querySelectorAll('select[name="startMonth"], select[name="endMonth"]');
+            const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+            months.forEach((month, index) => {
+                monthSelect.forEach(select => {
+                    const option = document.createElement('option');
+                    option.value = index + 1;
+                    option.textContent = month;
+                    select.appendChild(option);
+                });
+            });
+    
+            document.getElementById('searchForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const searchData = Object.fromEntries(formData);
+                
+                // Validate the month span
+                const startMonth = parseInt(searchData.startMonth);
+                const endMonth = parseInt(searchData.endMonth);
+                const monthSpan = (endMonth - startMonth + 12) % 12;
+                
+                if (monthSpan > 2) {
+                    alert('Please select a maximum of 3 months span for your search.');
+                    return;
+                }
+    
+                searchData.allInclusive = formData.get('allInclusive') === 'on';
+                console.log('Search data:', searchData);
+    
+                // Show loading spinner
+                document.getElementById('loading').classList.remove('hidden');
+                document.getElementById('result').classList.add('hidden');
+    
+                fetch('/api/search', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(searchData),
+                })
+                .then(response => response.json())
+                .then(result => {
+                    console.log('Received response:', result);
+                    const resultDiv = document.getElementById('result');
+                    const pricePerNight = (result.price / result.nights).toFixed(2);
+                    resultDiv.innerHTML = `
+                        <h2 class="text-2xl font-bold mb-4">Best Deal Found</h2>
+                        <img src="${result.imageUrl}" alt="${result.propertyName}" class="w-full h-64 object-cover mb-4 rounded">
+                        <h3 class="text-xl font-semibold mb-2">${result.propertyName}</h3>
+                        <p class="mb-2">Star Rating: ${result.starRating}</p>
+                        <p class="mb-2">Review Score: ${result.reviewScore} (${result.reviewCount} reviews)</p>
+                        <p class="mb-2">Price per night: ${pricePerNight} ${result.currency}</p>
+                        <p class="mb-2">Total price for ${result.nights} nights: ${result.price.toFixed(2)} ${result.currency}</p>
+                        <p class="mb-2">Check-in: ${result.checkIn}</p>
+                        <p class="mb-2">Check-out: ${result.checkOut}</p>
+                        ${result.isAllInclusive ? '<p class="mb-2 text-green-600 font-semibold">All-Inclusive</p>' : ''}
+                        <a href="${result.agodaUrl}" target="_blank" rel="noopener noreferrer" class="inline-block mt-4 bg-green-500 text-white p-2 rounded hover:bg-green-600">
+                            Book on Agoda
+                        </a>
+                    `;
+                    resultDiv.classList.remove('hidden');
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while searching for deals. Please try again.');
+                })
+                .finally(() => {
+                    // Hide loading spinner
+                    document.getElementById('loading').classList.add('hidden');
+                });
+            });
+        });
+    </script>
+</body>
+</html>
